@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,12 +9,18 @@ st.set_page_config(page_title="서울 100년 기온 변화", layout="centered")
 st.title("🌡️ 서울 100년 연평균 기온 변화 추이")
 st.markdown("지난 100년 동안 서울의 연평균 기온이 어떻게 변해왔는지 확인하는 대시보드입니다.")
 
-# 2. 데이터 불러오기 (깃허브 서버 내부의 로컬 파일 읽기)
+# 2. 데이터 불러오기 (절대 경로 추적 및 캐싱 처리)
 @st.cache_data
 def load_data():
-    # 외부 URL 대신 같은 폴더 내부의 csv 파일을 직접 호출합니다.
-    file_path = "seoul.csv"
+    # 현재 실행 중인 main.py 파일의 폴더 위치를 자동으로 찾습니다.
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(current_dir, "seoul.csv")
     
+    # 파일 존재 여부 선제 확인
+    if not os.path.exists(file_path):
+        st.error(f"📂 '{file_path}' 경로에서 데이터를 찾을 수 없습니다. 파일이 올바른 위치에 업로드되었는지 확인해 주세요.")
+        st.stop()
+        
     # 인코딩 형식을 안전하게 utf-8로 지정하여 로드
     df = pd.read_csv(file_path, encoding="utf-8")
     
@@ -33,23 +40,27 @@ try:
     min_year = int(data["연도"].min())
     max_year = int(data["연도"].max())
     
-    selected_years = st.sidebar.slider(
+    start_year, end_year = st.sidebar.slider(
         "조회할 연도 범위를 선택하세요",
         min_value=min_year,
         max_value=max_year,
         value=(min_year, max_year)
     )
 
-    # 선택한 연도 데이터 필터링
-    filtered_data = data[(data["연度"] >= selected_years[0]) & (data["연도"] <= selected_years[1])] if "연度" in data.columns else data[(data["연도"] >= selected_years[0]) & (data["연도"] <= selected_years[1])]
+    # 선택한 연도 범위 데이터 필터링
+    filtered_data = data[(data["연도"] >= start_year) & (data["연도"] <= end_year)]
 
     # 4. 주요 지표(Metric) 시각화
     if not filtered_data.empty:
         col1, col2 = st.columns(2)
         with col1:
-            st.metric(label=f"{selected_years[0]}년 평균 기온", value=f"{filtered_data['평균기온'].iloc[0]:.1f} °C")
+            start_temp = filtered_data['평균기온'].iloc[0]
+            st.metric(label=f"{start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
         with col2:
-            st.metric(label=f"{selected_years[1]}년 평균 기온", value=f"{filtered_data['평균기온'].iloc[-1]:.1f} °C")
+            end_temp = filtered_data['평균기온'].iloc[-1]
+            # 두 연도 간의 기온 차이를 delta로 표현
+            diff = end_temp - start_temp
+            st.metric(label=f"{end_year}년 평균 기온", value=f"{end_temp:.1f} °C", delta=f"{diff:+.1f} °C")
 
     # 5. 그래프 그리기
     st.subheader("📈 연평균 기온 변화 그래프")
