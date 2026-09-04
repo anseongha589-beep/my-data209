@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import io
 
-# [필수] Matplotlib 한글 깨짐 및 마이너스 기호 깨짐 해결 설정
+# [필수] Matplotlib 서버 환경 한글 깨짐 및 마이너스 기호 깨짐 해결 설정
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['axes.unicode_minus'] = False 
 
 # 1. 웹 페이지 설정 및 제목
-st.set_page_config(page_title="서울 100년 기온 데이터 종합 분석", layout="wide") 
-st.title("🌡️ 서울 100년 연평균 기온 변화 및 원본 데이터 특성 분석")
-st.markdown("지난 100년 동안의 서울 연평균 기온 변화를 확인하고 원본 데이터의 **요약 통계(개수, 평균, 최소, 최대 등)**를 함께 분석하는 대시보드입니다.")
+st.set_page_config(page_title="서울 100년 기온 데이터 정밀 분석", layout="wide") 
+st.title("🌡️ 서울 100년 연평균 기온 변화 및 원본 데이터 특성 정밀 분석")
+st.markdown("지난 100년 동안의 서울 연평균 기온 변화를 확인하고 원본 데이터의 **요약 통계(개수, 평균, 최소, 최대, 사분위수 등) 및 통계적 특성**을 상세히 분석하는 대시보드입니다.")
 
 # 2. 데이터 불러오기 (네트워크 장애 방지 백업 포함)
 @st.cache_data
@@ -68,23 +68,55 @@ try:
     # 3. 원본 데이터 로드
     original_data = load_data()
 
-    # 📌 4. [핵심 추가] 원본 데이터 특성 요약 통계 배치 (개수, 평균, 최소, 최대)
-    st.subheader("📋 전체 원본 데이터의 요약 통계 특성")
+    # 📌 4. [정밀 분석 강화] 원본 데이터 특성 정밀 요약 통계 테이블 상단 배치
+    st.subheader("📋 전체 원본 데이터의 특성 정밀 분석 요약")
     
-    # 100년 원본 전체 데이터 기준 기술통계량 산출
+    # 데이터 수치 변수 다각화 연산
     orig_count = float(len(original_data))
     orig_mean = original_data["평균기온"].mean()
+    orig_std = original_data["평균기온"].std()                 # 표준편차(변동성 변수)
     orig_min = original_data["평균기온"].min()
+    orig_q1 = original_data["평균기온"].quantile(0.25)          # 하위 25% 지점
+    orig_median = original_data["평균기온"].median()            # 50% 중앙값
+    orig_q3 = original_data["평균기온"].quantile(0.75)          # 상위 75% 지점
     orig_max = original_data["평균기온"].max()
+    orig_iqr = orig_q3 - orig_q1                               # 사분위간 범위(IQR) 데이터 흩어짐 분석용
     
-    # 사용자가 보기 좋게 한글 레이아웃의 데이터프레임 구성
-    summary_df = pd.DataFrame({
-        "데이터 요약 지표": ["데이터 총 개수 (Count)", "전체 평균 기온 (Mean)", "역사상 최소 기온 (Min)", "역사상 최대 기온 (Max)"],
-        "평균기온 통계치": [f"{orig_count:,.0f} 개년", f"{orig_mean:.2f} °C", f"{orig_min:.1f} °C", f"{orig_max:.1f} °C"]
+    # 100년 전체 기간 동안의 연평균 기온 상승 속도 계산 (추세선의 기울기 대용)
+    years_diff = original_data["연도"].max() - original_data["연도"].min()
+    z_full = np.polyfit(original_data["연도"], original_data["평균기온"], 1)
+    slope_10y = z_full[0] * 10                                  # 10년당 기온 상승률
+    
+    # 통계적 정밀 구조를 한눈에 보여주는 심화 데이터프레임 빌드
+    detailed_summary_df = pd.DataFrame({
+        "데이터 요약 및 분포 지표": [
+            "총 관측 데이터 개수 (Count)", 
+            "100년 전체 평균 기온 (Mean)", 
+            "기온 변동성 표준편차 (Std)", 
+            "역사상 최소 기온 (Min)", 
+            "하위 25% 기온 지점 (Q1)",
+            "데이터 중간 기온값 (Median, 50%)",
+            "상위 75% 기온 지점 (Q3)",
+            "역사상 최대 기온 (Max)",
+            "기온 밀집 구간 범위 (IQR)",
+            "10년 단위 평균 기온 상승 추세"
+        ],
+        "원본 정밀 통계치": [
+            f"{orig_count:,.0f} 개년", 
+            f"{orig_mean:.2f} °C", 
+            f"{orig_std:.2f} °C (평균 대비 변동성 폭)", 
+            f"{orig_min:.1f} °C", 
+            f"{orig_q1:.2f} °C", 
+            f"{orig_median:.1f} °C", 
+            f"{orig_q3:.2f} °C", 
+            f"{orig_max:.1f} °C", 
+            f"{orig_iqr:.2f} °C (전체 데이터의 50%가 밀집된 구간)", 
+            f"약 +{slope_10y:.2f} °C 상승 / 10년당"
+        ]
     })
     
-    # 불필요한 인덱스(0, 1, 2)를 숨겨 정갈하게 최상단 고정 노출
-    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+    # 대시보드 최상단 고정 노출 (정확한 테이블 정렬 구조)
+    st.dataframe(detailed_summary_df, use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
@@ -107,7 +139,6 @@ try:
     if not filtered_data.empty:
         col1, col2 = st.columns(2)
         with col1:
-            # [수정 완료] 기존 iloc 구문 에러 완전 해결
             start_temp = filtered_data['평균기온'].iloc[0]
             st.metric(label=f"⏰ {start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
         with col2:
@@ -117,7 +148,7 @@ try:
 
     st.markdown("---")
 
-    # 7. 좌우 레이아웃 분할 (좌측: 트렌드 추세선 그래프 / 우측: 사분위수 상세 정보 및 분포)
+    # 7. 좌우 레이아웃 분할 (좌측: 트렌드 추세선 그래프 / 우측: 원본 데이터 무결성 및 편향 박스플롯)
     col_left, col_right = st.columns([1.1, 0.9])
 
     with col_left:
@@ -127,13 +158,11 @@ try:
         fig_trend, ax_trend = plt.subplots(figsize=(10, 5.5))
         ax_trend.plot(filtered_data["연도"], filtered_data["평균기온"], marker='o', linestyle='-', color='#ff4b4b', label="Annual Mean Temp")
         
-        # 데이터가 2개 이상일 때만 추세선 추가
         if len(filtered_data) > 1:
             z = np.polyfit(filtered_data["연도"], filtered_data["평균기온"], 1)
             p = np.poly1d(z)
             ax_trend.plot(filtered_data["연도"], p(filtered_data["연도"]), linestyle="--", color="#31333F", alpha=0.7, label="Trend Line")
 
-        # [한글 깨짐 해결] 리눅스 서버 안정성을 위해 내부 레이블 영문 고정
         ax_trend.set_xlabel("Year", fontsize=10)
         ax_trend.set_ylabel("Temperature (°C)", fontsize=10)
         ax_trend.grid(True, linestyle=":", alpha=0.6)
@@ -141,50 +170,36 @@ try:
         st.pyplot(fig_trend)
 
     with col_right:
-        st.subheader("📊 데이터 세부 분포 및 무결성")
-        
-        # 상세 기술통계량 표 (사분위수 포함)
-        st.markdown("**1. 상세 기술통계량 (사분위수)**")
-        summary = original_data["평균기온"].describe().to_frame()
-        summary.index = ["데이터 개수 (개)", "평균 기온 (°C)", "표준편차 (변동성)", "최소 기온 (°C)", "25% (하위 사분위)", "50% (중앙값)", "75% (상위 사분위)", "최대 기온 (°C)"]
-        summary.columns = ["통계치"]
-        st.dataframe(summary.style.format("{:.2f}"), use_container_width=True)
+        st.subheader("📦 원본 데이터 분포 균일도 및 무결성 검증")
         
         # 원본 데이터 무결성 검증 (결측치)
-        st.markdown("**2. 결측치(누락) 검증**")
         null_count = original_data["평균기온"].isnull().sum()
         if null_count == 0:
-            st.success("✅ 원본 데이터 내 결측치가 존재하지 않는 깨끗한 데이터입니다.")
+            st.success("✅ 결측치 검증: 원본 데이터 내 결측치가 존재하지 않는 완벽한 데이터셋입니다.")
         else:
-            st.warning(f"⚠️ 원본 데이터 내에 {null_count}개의 누락된 값이 발견되어 필터링되었습니다.")
+            st.warning(f"⚠️ 결측치 검증: 원본 데이터 내에 {null_count}개의 누락된 값이 발견되어 필터링되었습니다.")
 
-    st.markdown("---")
-
-    # 8. 하단 배치: 이상치 검출용 박스플롯 분포 및 원본 레코드 테이블
-    col_box, col_table = st.columns([0.8, 1.2])
-
-    with col_box:
-        st.subheader("📦 데이터 치우침 점검 (Boxplot)")
-        fig_box, ax_box = plt.subplots(figsize=(5, 4))
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        # 외부 seaborn 종속성 없이 matplotlib 순정 코드로 정교하게 박스플롯 구성
+        # 이상치 및 데이터 치우침 확인용 순정 Matplotlib 박스플롯
+        fig_box, ax_box = plt.subplots(figsize=(5, 3.8))
         ax_box.boxplot(original_data["평균기온"], patch_artist=True, 
                        boxprops=dict(facecolor='#ffebeb', color='#ff4b4b', linewidth=1.5),
                        medianprops=dict(color='#31333F', linewidth=2),
                        whiskerprops=dict(color='#ff4b4b', linewidth=1.5),
                        capprops=dict(color='#ff4b4b', linewidth=1.5))
         
-        # [한글 깨짐 해결] 그래프 내부 영문 매핑
         ax_box.set_title("Original Temperature Distribution", fontsize=11, fontweight='bold', pad=10)
         ax_box.set_ylabel("Temperature Values (°C)", fontsize=9)
         ax_box.set_xticklabels(["Original Data"])
         ax_box.grid(True, linestyle=":", alpha=0.5)
         st.pyplot(fig_box)
 
-    with col_table:
-        st.subheader("🗃️ 필터링된 데이터 레코드")
-        # 사용자가 스크롤하며 실제 수치를 직접 볼 수 있는 테이블
-        st.dataframe(filtered_data.set_index("연도"), use_container_width=True, height=265)
+    st.markdown("---")
+
+    # 8. 하단 배치: 전체 데이터 레코드 테이블
+    if st.checkbox("전체 데이터 테이블 데이터프레임으로 보기"):
+        st.dataframe(filtered_data.set_index("연도"), use_container_width=True)
 
 except Exception as e:
     st.error(f"데이터를 처리하는 중 오류가 발생했습니다: {e}")
