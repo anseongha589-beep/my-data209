@@ -70,7 +70,7 @@ try:
     # 3. 사이드바 제어 조절기
     st.sidebar.header("📊 조회 설정")
     min_year = int(data["연도"].min())
-    max_year = int(data["연度"].max() if "연度" in data.columns else data["연도"].max())
+    max_year = int(data["연도"].max())
     
     start_year, end_year = st.sidebar.slider(
         "조회할 연도 범위를 선택하세요",
@@ -82,47 +82,43 @@ try:
     # 선택한 연도 범위 데이터 필터링
     filtered_data = data[(data["연도"] >= start_year) & (data["연도"] <= end_year)]
 
-    # 📌 4. [기능 보완] 원본 전체 데이터 요약 특성 Metric 배치
-    st.subheader("🗃️ 100년 원본 데이터 주요 요약통계 특성")
+    # 📌 4. [요청 반영] 원본 데이터 요약 통계 테이블 상단 배치 (이미지 예시 스타일)
+    st.subheader("📋 원본 데이터 요약 통계 (전체 기간 특성 분석)")
     
-    # 원본 데이터 특성 추출
+    # 원본 데이터 특성 계산
     orig_count = len(data)
     orig_mean = data["평균기온"].mean()
     orig_min = data["평균기온"].min()
     orig_max = data["평균기온"].max()
-    orig_min_year = data.loc[data["평균기온"].idxmin(), "연도"]
-    orig_max_year = data.loc[data["평균기온"].idxmax(), "연도"]
-
-    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-    with m_col1:
-        st.metric(label="🔢 총 데이터 개수", value=f"{orig_count} 개년")
-    with m_col2:
-        st.metric(label="🌡️ 100년 전체 평균 기온", value=f"{orig_mean:.2f} °C")
-    with m_col3:
-        st.metric(label="❄️ 역사상 최저 연평균 기온", value=f"{orig_min:.1f} °C", delta=f"{orig_min_year}년")
-    with m_col4:
-        st.metric(label="☀️ 역사상 최고 연평균 기온", value=f"{orig_max:.1f} °C", delta=f"{orig_max_year}년")
+    
+    # 예시 화면처럼 깔끔한 표(DataFrame) 형태로 구성
+    summary_df = pd.DataFrame({
+        "특성 분석 지표": ["데이터 총 개수 (개년)", "전체 평균 기온 (°C)", "역사상 최소 기온 (°C)", "역사상 최대 기온 (°C)"],
+        "원본 요약통계치": [f"{orig_count}개년", f"{orig_mean:.2f} °C", f"{orig_min:.2f} °C", f"{orig_max:.2f} °C"]
+    })
+    
+    # 인덱스 없이 깔끔하게 표로 출력
+    st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
     # 5. 선택 기간 지표(Metric) 시각화
-    st.subheader(f"🔍 선택 기간 ({start_year}년 ~ {end_year}년) 요약 비교")
     if not filtered_data.empty:
         col1, col2 = st.columns(2)
         with col1:
             start_temp = filtered_data['평균기온'].iloc[0]
-            st.metric(label=f"{start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
+            st.metric(label=f"⏳ {start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
         with col2:
             end_temp = filtered_data['평균기온'].iloc[-1]
             diff = end_temp - start_temp
-            st.metric(label=f"{end_year}년 평균 기온", value=f"{end_temp:.1f} °C", delta=f"{diff:+.1f} °C")
+            st.metric(label=f"⏰ {end_year}년 평균 기온", value=f"{end_temp:.1f} °C", delta=f"{diff:+.1f} °C")
 
     st.markdown("---")
 
     # 6. 데이터 특성 분석 및 요약 통계 탭 구성
-    st.subheader("📊 세부 데이터 특성 및 분포 시각화")
+    st.subheader("📊 데이터 분포 및 시각화 리포트")
     
-    tab1, tab2 = st.tabs(["📈 기온 변화 트렌드 그래프", "📋 세부 통계치 및 분포"])
+    tab1, tab2 = st.tabs(["📈 기온 변화 트렌드 그래프", "📊 기술통계량 상세 정보"])
 
     with tab1:
         st.write(f"### {start_year}년 ~ {end_year}년 기온 변화 추세")
@@ -134,7 +130,7 @@ try:
             p = np.poly1d(z)
             ax.plot(filtered_data["연도"], p(filtered_data["연도"]), linestyle="--", color="#31333F", alpha=0.7, label="Trend Line")
 
-        # [한글 깨짐 해결] 그래프 내부는 안전한 영문 레이블 사용
+        # [한글 깨짐 해결] 그래프 내부는 안전한 영문 사용
         ax.set_xlabel("Year")
         ax.set_ylabel("Temperature (°C)")
         ax.grid(True, linestyle=":", alpha=0.6)
@@ -142,11 +138,11 @@ try:
         st.pyplot(fig)
 
     with tab2:
-        st.write("### 🗃️ 전체 원본 데이터 상세 구조 분석")
+        st.write("### 🗃️ 전체 수치 분포 및 무결성 분석")
         col_stats, col_box = st.columns([1, 1])
         
         with col_stats:
-            st.markdown("**1. 기술통계량 전체 테이블**")
+            st.markdown("**1. 상세 기술통계량 표**")
             summary = data["평균기온"].describe().to_frame()
             summary.index = ["데이터 개수 (개)", "평균 기온 (°C)", "표준편차 (변동성)", "최소 기온 (°C)", "25% (하위 사분위)", "50% (중앙값)", "75% (상위 사분위)", "최대 기온 (°C)"]
             summary.columns = ["통계치"]
@@ -157,20 +153,19 @@ try:
             if null_count == 0:
                 st.success("✅ 원본 데이터 내 결측치(누락된 값)가 존재하지 않는 깨끗한 데이터입니다.")
             else:
-                st.warning(f"⚠️ 원본 데이터 내에 {null_count}개의 누락된 값(결측치)이 발견되어 보정되었습니다.")
+                st.warning(f"⚠️ 원본 데이터 내에 {null_count}개의 누락된 값이 발견되어 필터링되었습니다.")
 
         with col_box:
-            st.markdown("**3. 이상치(Outlier) 및 데이터 치우침 확인 (Boxplot)**")
+            st.markdown("**3. 데이터 치우침 확인 (Boxplot)**")
             fig_box, ax_box = plt.subplots(figsize=(6, 5.2))
             
-            # [수정] 외부 seaborn 패키지 에러 완벽 차단 및 순정 matplotlib 구현
+            # seaborn 없이 matplotlib 순정 코드로 안전하게 박스플롯 구성
             ax_box.boxplot(data["평균기온"], patch_artist=True,
                            boxprops=dict(facecolor='#ffebeb', color='#ff4b4b', linewidth=1.5),
                            medianprops=dict(color='#31333F', linewidth=2),
                            whiskerprops=dict(color='#ff4b4b', linewidth=1.5),
                            capprops=dict(color='#ff4b4b', linewidth=1.5))
             
-            # [한글 깨짐 해결] 그래프 내부 영문 매핑
             ax_box.set_title("Original Temperature Distribution", fontsize=11, fontweight='bold')
             ax_box.set_ylabel("Temperature (°C)")
             ax_box.set_xticklabels(["Seoul"])
@@ -179,9 +174,9 @@ try:
 
     st.markdown("---")
 
-    # 7. 데이터 표 확인
+    # 7. 전체 데이터 레코드 테이블
     if st.checkbox("전체 데이터 테이블 데이터프레임으로 보기"):
-        st.dataframe(filtered_data.set_index("연도"))
+        st.dataframe(filtered_data.set_index("연도"), use_container_width=True)
 
 except Exception as e:
     st.error(f"데이터를 처리하는 중 오류가 발생했습니다: {e}")
