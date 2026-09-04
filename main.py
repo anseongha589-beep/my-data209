@@ -82,43 +82,43 @@ try:
     # 선택한 연도 범위 데이터 필터링
     filtered_data = data[(data["연도"] >= start_year) & (data["연도"] <= end_year)]
 
-    # 📌 4. [요청 반영] 원본 데이터 요약 통계 테이블 상단 배치 (이미지 예시 스타일)
-    st.subheader("📋 원본 데이터 요약 통계 (전체 기간 특성 분석)")
+    # 📌 4. [요청 반영] 예시 이미지 스타일의 원본 데이터 요약통계 표 상단 배치
+    st.subheader("📋 원본 데이터 특성 요약 통계")
     
-    # 원본 데이터 특성 계산
-    orig_count = len(data)
+    # 원본 데이터 기준 핵심 기술통계 연산
+    orig_count = float(len(data))
     orig_mean = data["평균기온"].mean()
     orig_min = data["평균기온"].min()
     orig_max = data["평균기온"].max()
     
-    # 예시 화면처럼 깔끔한 표(DataFrame) 형태로 구성
+    # 예시 스크린샷과 정확히 일치하는 직관적인 행/열 구조의 데이터프레임 생성
     summary_df = pd.DataFrame({
-        "특성 분석 지표": ["데이터 총 개수 (개년)", "전체 평균 기온 (°C)", "역사상 최소 기온 (°C)", "역사상 최대 기온 (°C)"],
-        "원본 요약통계치": [f"{orig_count}개년", f"{orig_mean:.2f} °C", f"{orig_min:.2f} °C", f"{orig_max:.2f} °C"]
+        "구분": ["개수 (Count)", "평균 (Mean)", "최소 (Min)", "최대 (Max)"],
+        "평균기온 통계치": [f"{orig_count:,.0f} 개년", f"{orig_mean:.2f} °C", f"{orig_min:.1f} °C", f"{orig_max:.1f} °C"]
     })
     
-    # 인덱스 없이 깔끔하게 표로 출력
+    # 대시보드 상단에 인덱스를 숨긴 정갈한 데이터 테이블로 렌더링
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
-    # 5. 선택 기간 지표(Metric) 시각화
+    # 5. 선택 기간 주요 지표(Metric) 시각화
     if not filtered_data.empty:
         col1, col2 = st.columns(2)
         with col1:
             start_temp = filtered_data['평균기온'].iloc[0]
-            st.metric(label=f"⏳ {start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
+            st.metric(label=f"⏰ {start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
         with col2:
             end_temp = filtered_data['평균기온'].iloc[-1]
             diff = end_temp - start_temp
-            st.metric(label=f"⏰ {end_year}년 평균 기온", value=f"{end_temp:.1f} °C", delta=f"{diff:+.1f} °C")
+            st.metric(label=f"⏳ {end_year}년 평균 기온", value=f"{end_temp:.1f} °C", delta=f"{diff:+.1f} °C")
 
     st.markdown("---")
 
     # 6. 데이터 특성 분석 및 요약 통계 탭 구성
     st.subheader("📊 데이터 분포 및 시각화 리포트")
     
-    tab1, tab2 = st.tabs(["📈 기온 변화 트렌드 그래프", "📊 기술통계량 상세 정보"])
+    tab1, tab2 = st.tabs(["📈 기온 변화 트렌드 그래프", "📊 상세 기술통계량 정보"])
 
     with tab1:
         st.write(f"### {start_year}년 ~ {end_year}년 기온 변화 추세")
@@ -130,7 +130,7 @@ try:
             p = np.poly1d(z)
             ax.plot(filtered_data["연도"], p(filtered_data["연도"]), linestyle="--", color="#31333F", alpha=0.7, label="Trend Line")
 
-        # [한글 깨짐 해결] 그래프 내부는 안전한 영문 사용
+        # [한글 깨짐 해결] 리눅스 서버 안정성을 위해 내부 레이블 영문 고정
         ax.set_xlabel("Year")
         ax.set_ylabel("Temperature (°C)")
         ax.grid(True, linestyle=":", alpha=0.6)
@@ -138,11 +138,11 @@ try:
         st.pyplot(fig)
 
     with tab2:
-        st.write("### 🗃️ 전체 수치 분포 및 무결성 분석")
+        st.write("### 🗃️ 전체 원본 데이터 상세 분포")
         col_stats, col_box = st.columns([1, 1])
         
         with col_stats:
-            st.markdown("**1. 상세 기술통계량 표**")
+            st.markdown("**1. 데이터 사분위수 상세 테이블**")
             summary = data["평균기온"].describe().to_frame()
             summary.index = ["데이터 개수 (개)", "평균 기온 (°C)", "표준편차 (변동성)", "최소 기온 (°C)", "25% (하위 사분위)", "50% (중앙값)", "75% (상위 사분위)", "최대 기온 (°C)"]
             summary.columns = ["통계치"]
@@ -156,10 +156,10 @@ try:
                 st.warning(f"⚠️ 원본 데이터 내에 {null_count}개의 누락된 값이 발견되어 필터링되었습니다.")
 
         with col_box:
-            st.markdown("**3. 데이터 치우침 확인 (Boxplot)**")
+            st.markdown("**3. 이상치 및 데이터 편향 확인 (Boxplot)**")
             fig_box, ax_box = plt.subplots(figsize=(6, 5.2))
             
-            # seaborn 없이 matplotlib 순정 코드로 안전하게 박스플롯 구성
+            # 외부 seaborn 종속성 없이 오직 matplotlib 스타일로 정교하게 구현
             ax_box.boxplot(data["평균기온"], patch_artist=True,
                            boxprops=dict(facecolor='#ffebeb', color='#ff4b4b', linewidth=1.5),
                            medianprops=dict(color='#31333F', linewidth=2),
@@ -174,7 +174,7 @@ try:
 
     st.markdown("---")
 
-    # 7. 전체 데이터 레코드 테이블
+    # 7. 전체 데이터 테이블 확인
     if st.checkbox("전체 데이터 테이블 데이터프레임으로 보기"):
         st.dataframe(filtered_data.set_index("연도"), use_container_width=True)
 
