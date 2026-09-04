@@ -82,39 +82,24 @@ try:
     # 선택한 연도 범위 데이터 필터링
     filtered_data = data[(data["연도"] >= start_year) & (data["연도"] <= end_year)]
 
-    # 4. 원본 데이터 요약통계 표 상단 배치 (이미지 예시 스타일)
-    st.subheader("📋 원본 데이터 특성 요약 통계")
-    
-    orig_count = float(len(data))
-    orig_mean = data["평균기온"].mean()
-    orig_min = data["평균기온"].min()
-    orig_max = data["평균기온"].max()
-    
-    summary_df = pd.DataFrame({
-        "구분": ["개수 (Count)", "평균 (Mean)", "최소 (Min)", "최대 (Max)"],
-        "평균기온 통계치": [f"{orig_count:,.0f} 개년", f"{orig_mean:.2f} °C", f"{orig_min:.1f} °C", f"{orig_max:.1f} °C"]
-    })
-    st.dataframe(summary_df, use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    # 5. 선택 기간 주요 지표(Metric) 시각화
+    # 4. 주요 지표(Metric) 시각화 (선택한 필터 기간 기준)
     if not filtered_data.empty:
         col1, col2 = st.columns(2)
         with col1:
             start_temp = filtered_data['평균기온'].iloc[0]
-            st.metric(label=f"⏰ {start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
+            st.metric(label=f"{start_year}년 평균 기온", value=f"{start_temp:.1f} °C")
         with col2:
             end_temp = filtered_data['평균기온'].iloc[-1]
             diff = end_temp - start_temp
-            st.metric(label=f"⏳ {end_year}년 평균 기온", value=f"{end_temp:.1f} °C", delta=f"{diff:+.1f} °C")
+            st.metric(label=f"{end_year}년 평균 기온", value=f"{end_temp:.1f} °C", delta=f"{diff:+.1f} °C")
 
     st.markdown("---")
 
-    # 6. 데이터 특성 분석 및 요약 통계 탭 구성
-    st.subheader("📊 데이터 분포 및 시각화 리포트")
+    # 5. 데이터 특성 분석 및 요약 통계 탭 구성
+    st.subheader("🔍 데이터 특성 분석 및 요약 통계")
     
-    tab1, tab2 = st.tabs(["📈 기온 변화 트렌드 그래프", "📊 상세 기술통계량 및 이상치 분석"])
+    # 두 개의 탭으로 레이아웃 세분화
+    tab1, tab2 = st.tabs(["📈 기온 변화 트렌드 그래프", "📊 원본 데이터 요약 통계 및 분포"])
 
     with tab1:
         st.write(f"### {start_year}년 ~ {end_year}년 기온 변화 추세")
@@ -126,6 +111,7 @@ try:
             p = np.poly1d(z)
             ax.plot(filtered_data["연도"], p(filtered_data["연도"]), linestyle="--", color="#31333F", alpha=0.7, label="Trend Line")
 
+        # [한글 깨짐 방지] 그래프 내부는 안전한 영문 레이블 적용
         ax.set_xlabel("Year")
         ax.set_ylabel("Temperature (°C)")
         ax.grid(True, linestyle=":", alpha=0.6)
@@ -133,62 +119,56 @@ try:
         st.pyplot(fig)
 
     with tab2:
-        st.write("### 🗃️ 전체 원본 데이터 상세 분포 및 이상치 발생 시점")
-        col_stats, col_box = st.columns([1, 1.2]) # 박스플롯과 날짜 표가 들어갈 우측 공간을 넓게 지정
+        st.write("### 🗃️ 전체 원본 데이터의 요약 통계 특성")
+        
+        col_stats, col_box = st.columns([1, 1])
         
         with col_stats:
-            st.markdown("**1. 데이터 사분위수 상세 테이블**")
+            # 원래 사용하시던 df.describe() 분석 핵심 결과를 보기 좋은 한글로 구성
+            st.markdown("**1. 수치형 데이터 기술통계량**")
             summary = data["평균기온"].describe().to_frame()
-            summary.index = ["데이터 개수 (개)", "평균 기온 (°C)", "표준편차 (변동성)", "최소 기온 (°C)", "25% (하위 사분위)", "50% (중앙값)", "75% (상위 사분위)", "최대 기온 (°C)"]
+            summary.index = [
+                "데이터 개수 (개년)", 
+                "평균 기온 (°C)", 
+                "표준편차 (변동성)", 
+                "최소 기온 (°C)", 
+                "25% (하위 사분위)", 
+                "50% (중앙값)", 
+                "75% (상위 사분위)", 
+                "최대 기온 (°C)"
+            ]
             summary.columns = ["통계치"]
             st.dataframe(summary.style.format("{:.2f}"), use_container_width=True)
             
-            st.markdown("**2. 데이터 무결성 검증 (결측치)**")
+            # 결측치 무결성 검증 추가
+            st.markdown("**2. 데이터 무결성 검증**")
             null_count = data["평균기온"].isnull().sum()
             if null_count == 0:
                 st.success("✅ 원본 데이터 내 결측치(누락된 값)가 존재하지 않는 깨끗한 데이터입니다.")
             else:
-                st.warning(f"⚠️ 원본 데이터 내에 {null_count}개의 누락된 값이 발견되어 보정되었습니다.")
+                st.warning(f"⚠️ 원본 데이터 내에 {null_count}개의 누락된 값(결측치)이 발견되어 보정되었습니다.")
 
         with col_box:
-            st.markdown("**3. 이상치 및 데이터 편향 확인 (Boxplot & 날짜 연동)**")
+            # 원본 데이터 고유의 편향과 이상치를 검출하는 순정 Matplotlib 박스플롯
+            st.markdown("**3. 이상치(Outlier) 및 데이터 치우침 확인 (Boxplot)**")
+            fig_box, ax_box = plt.subplots(figsize=(6, 5.2))
             
-            # 박스플롯 차트와 극단값 날짜를 나란히 보여주기 위해 하위 컬럼 분할
-            sub_col_chart, sub_col_date = st.columns([1.1, 0.9])
+            ax_box.boxplot(data["평균기온"], patch_artist=True,
+                           boxprops=dict(facecolor='#ffebeb', color='#ff4b4b', linewidth=1.5),
+                           medianprops=dict(color='#31333F', linewidth=2),
+                           whiskerprops=dict(color='#ff4b4b', linewidth=1.5),
+                           capprops=dict(color='#ff4b4b', linewidth=1.5))
             
-            with sub_col_chart:
-                fig_box, ax_box = plt.subplots(figsize=(4.5, 5))
-                ax_box.boxplot(data["평균기온"], patch_artist=True,
-                               boxprops=dict(facecolor='#ffebeb', color='#ff4b4b', linewidth=1.5),
-                               medianprops=dict(color='#31333F', linewidth=2),
-                               whiskerprops=dict(color='#ff4b4b', linewidth=1.5),
-                               capprops=dict(color='#ff4b4b', linewidth=1.5))
-                
-                ax_box.set_title("Temperature Distribution", fontsize=11, fontweight='bold')
-                ax_box.set_ylabel("Temperature (°C)")
-                ax_box.set_xticklabels(["Seoul"])
-                ax_box.grid(True, linestyle="--", alpha=0.5)
-                st.pyplot(fig_box)
-            
-            with sub_col_date:
-                st.markdown("<br><br>", unsafe_allow_html=True) # 그래프 높이와 맞추기 위한 여백
-                st.info("📌 **극단값 발생 연도 정보**")
-                
-                # 원본 데이터에서 최저, 최고 기온이 발생한 행(연도) 추출
-                min_row = data.loc[data["평균기온"].idxmin()]
-                max_row = data.loc[data["평균기온"].idxmax()]
-                
-                extreme_df = pd.DataFrame({
-                    "특성 구분": ["역사상 최저점", "역사상 최고점"],
-                    "발생 연도": [f"{int(min_row['연도'])}년", f"{int(max_row['연도'])}년"],
-                    "당시 기온": [f"{min_row['평균기온']:.1f} °C", f"{max_row['평균기온']:.1f} °C"]
-                })
-                st.dataframe(extreme_df, use_container_width=True, hide_index=True)
-                st.caption("※ 박스플롯 위아래 수염(Whisker) 끝단에 위치하는 치우침 분석용 실측치 기준입니다.")
+            # [한글 깨짐 방지] 그래프 타이틀 및 축 영문 처리
+            ax_box.set_title("Original Temperature Distribution", fontsize=11, fontweight='bold')
+            ax_box.set_ylabel("Temperature (°C)")
+            ax_box.set_xticklabels(["Seoul"])
+            ax_box.grid(True, linestyle="--", alpha=0.5)
+            st.pyplot(fig_box)
 
     st.markdown("---")
 
-    # 7. 전체 데이터 테이블 확인
+    # 6. 하단 전체 데이터 표 확인
     if st.checkbox("전체 데이터 테이블 데이터프레임으로 보기"):
         st.dataframe(filtered_data.set_index("연도"), use_container_width=True)
 
