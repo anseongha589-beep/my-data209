@@ -1,9 +1,12 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 import io
+
+# [필수] Matplotlib 한글 깨짐 및 마이너스 기호 깨짐 해결 설정
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['axes.unicode_minus'] = False 
 
 # 1. 웹 페이지 설정 및 제목
 st.set_page_config(page_title="서울 100년 기온 변화", layout="wide") # 통계 표와 그래프를 넓게 보기 위해 wide 레이아웃 적용
@@ -77,7 +80,7 @@ try:
     )
 
     # 선택한 연도 범위 데이터 필터링
-    filtered_data = data[(data["연도"] >= start_year) & (data["연도"] <= end_year)]
+    filtered_data = data[(data["연도"] >= start_year) & (data["연度"] <= end_year if "연度" in data.columns else data["연도"] <= end_year)]
 
     # 4. 주요 지표(Metric) 시각화
     if not filtered_data.empty:
@@ -92,7 +95,7 @@ try:
 
     st.markdown("---")
 
-    # 📌 5. [핵심 통합] 데이터 특성 분석 및 요약 통계 탭 구성
+    # 📌 5. 데이터 특성 분석 및 요약 통계 탭 구성
     st.subheader("🔍 데이터 특성 분석 및 요약 통계")
     
     # 두 개의 탭으로 나누어 보기 좋게 배치 (조회 데이터 트렌드 vs 원본 데이터 프로파일링)
@@ -101,13 +104,14 @@ try:
     with tab1:
         st.write(f"### {start_year}년 ~ {end_year}년 기온 변화 추세")
         fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(filtered_data["연도"], filtered_data["평균기온"], marker='o', linestyle='-', color='#ff4b4b', label="연평균 기온")
+        ax.plot(filtered_data["연도"], filtered_data["평균기온"], marker='o', linestyle='-', color='#ff4b4b', label="Annual Mean Temp")
         
         if len(filtered_data) > 1:
             z = np.polyfit(filtered_data["연도"], filtered_data["평균기온"], 1)
             p = np.poly1d(z)
-            ax.plot(filtered_data["연도"], p(filtered_data["연도"]), linestyle="--", color="#31333F", alpha=0.7, label="기온 추세선")
+            ax.plot(filtered_data["연도"], p(filtered_data["연도"]), linestyle="--", color="#31333F", alpha=0.7, label="Trend Line")
 
+        # [한글 깨짐 해결] 그래프 내부는 안전한 영문으로 매핑
         ax.set_xlabel("Year")
         ax.set_ylabel("Temperature (°C)")
         ax.grid(True, linestyle=":", alpha=0.6)
@@ -136,12 +140,20 @@ try:
                 st.warning(f"⚠️ 원본 데이터 내에 {null_count}개의 누락된 값(결측치)이 발견되어 보정되었습니다.")
 
         with col_box:
-            # 원래 쓰시던 sns.boxplot() 시각화 분석을 대시보드 화면 내에 직접 출력
             st.markdown("**3. 이상치(Outlier) 및 데이터 치우침 확인 (Boxplot)**")
             fig_box, ax_box = plt.subplots(figsize=(6, 5.2))
-            sns.boxplot(y=data["평균기온"], color='#ff7f7f', ax=ax_box)
-            ax_box.set_title("Original Temperature Distribution", fontsize=11)
+            
+            # [수정] 외부 seaborn 의존성을 완전히 제거하고 matplotlib 기본 기능으로 박스플롯 구현
+            ax_box.boxplot(data["평균기온"], patch_artist=True,
+                           boxprops=dict(facecolor='#ffebeb', color='#ff4b4b', linewidth=1.5),
+                           medianprops=dict(color='#31333F', linewidth=2),
+                           whiskerprops=dict(color='#ff4b4b', linewidth=1.5),
+                           capprops=dict(color='#ff4b4b', linewidth=1.5))
+            
+            # [한글 깨짐 해결] 그래프 내부는 안전한 영문으로 매핑
+            ax_box.set_title("Original Temperature Distribution", fontsize=11, fontweight='bold')
             ax_box.set_ylabel("Temperature (°C)")
+            ax_box.set_xticklabels(["Seoul"])
             ax_box.grid(True, linestyle="--", alpha=0.5)
             st.pyplot(fig_box)
 
